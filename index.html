@@ -1,0 +1,1625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMBIENT - India's Indoor Air Quality Explorer</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-dark: #0a1828;
+            --primary-blue: #178582;
+            --accent-cyan: #3dd9c8;
+            --danger-red: #ff4757;
+            --warning-amber: #ffa502;
+            --success-green: #26de81;
+            --bg-dark: #0f1419;
+            --bg-card: #1a2332;
+            --text-primary: #e8eaed;
+            --text-secondary: #9ca3af;
+            --border-color: #2d3748;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: 'Archivo', -apple-system, BlinkMacSystemFont, sans-serif;
+            display: flex;
+            margin: 0;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+        }
+
+        /* Mode Toggle */
+        .mode-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            display: flex;
+            gap: 10px;
+            background: var(--bg-card);
+            padding: 8px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .mode-btn {
+            padding: 10px 20px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .mode-btn.active {
+            background: linear-gradient(135deg, var(--primary-blue), var(--accent-cyan));
+            color: white;
+        }
+
+        .mode-btn:hover:not(.active) {
+            background: var(--primary-dark);
+            color: var(--text-primary);
+        }
+
+        #sidebar {
+            width: 400px;
+            height: 100vh;
+            background: linear-gradient(180deg, var(--primary-dark) 0%, var(--bg-dark) 100%);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
+            position: relative;
+            z-index: 1000;
+            flex-shrink: 0;
+        }
+
+        .sidebar-header {
+            padding: 32px 28px 24px;
+            background: var(--primary-dark);
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--primary-blue), var(--accent-cyan));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 18px;
+            animation: pulse 3s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .logo h1 {
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--primary-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .tagline {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+            font-weight: 400;
+        }
+
+        .search-section {
+            padding: 24px 28px;
+            flex-shrink: 0;
+        }
+
+        .input-group {
+            margin-bottom: 16px;
+        }
+
+        .input-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        input[type="text"], input[type="number"], select {
+            width: 100%;
+            padding: 14px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 15px;
+            font-family: 'Archivo', sans-serif;
+            transition: all 0.3s ease;
+            outline: none;
+        }
+
+        input[type="text"]:focus, input[type="number"]:focus, select:focus {
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 3px rgba(23, 133, 130, 0.1);
+        }
+
+        input::placeholder {
+            color: var(--text-secondary);
+        }
+
+        /* Radius Slider */
+        .slider-container {
+            margin-top: 12px;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .slider-value {
+            color: var(--accent-cyan);
+            font-weight: 600;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: var(--bg-card);
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: linear-gradient(135deg, var(--primary-blue), var(--accent-cyan));
+            cursor: pointer;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(23, 133, 130, 0.4);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: linear-gradient(135deg, var(--primary-blue), var(--accent-cyan));
+            cursor: pointer;
+            border-radius: 50%;
+            border: none;
+            box-shadow: 0 2px 8px rgba(23, 133, 130, 0.4);
+        }
+
+        .area-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+        }
+
+        .area-input-small {
+            padding: 12px;
+            font-size: 14px;
+        }
+
+        .search-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, var(--primary-blue), var(--accent-cyan));
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .search-btn:hover:not(.loading) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(23, 133, 130, 0.4);
+        }
+
+        .search-btn:active {
+            transform: translateY(0);
+        }
+
+        .search-btn.loading {
+            pointer-events: none;
+            opacity: 0.7;
+        }
+
+        .search-btn.loading::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            animation: loading 1.5s infinite;
+        }
+
+        @keyframes loading {
+            to { left: 100%; }
+        }
+
+        .results-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 28px 24px;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 16px;
+        }
+
+        .results-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .results-count {
+            font-size: 13px;
+            color: var(--text-secondary);
+            background: var(--bg-card);
+            padding: 4px 12px;
+            border-radius: 12px;
+        }
+
+        .place-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .place-item:hover {
+            border-color: var(--primary-blue);
+            box-shadow: 0 8px 24px rgba(23, 133, 130, 0.2);
+        }
+
+        .place-header {
+            display: flex;
+            gap: 14px;
+            margin-bottom: 12px;
+        }
+
+        .place-image {
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            object-fit: cover;
+            flex-shrink: 0;
+            background: var(--primary-dark);
+        }
+
+        .place-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .place-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .place-aqi {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .aqi-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .aqi-value {
+            font-size: 24px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .aqi-good { color: var(--success-green); }
+        .aqi-moderate { color: var(--warning-amber); }
+        .aqi-unhealthy { color: var(--danger-red); }
+
+        .aqi-badge {
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .badge-good {
+            background: rgba(38, 222, 129, 0.15);
+            color: var(--success-green);
+        }
+
+        .badge-moderate {
+            background: rgba(255, 165, 2, 0.15);
+            color: var(--warning-amber);
+        }
+
+        .badge-unhealthy {
+            background: rgba(255, 71, 87, 0.15);
+            color: var(--danger-red);
+        }
+
+        .place-details {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .improvement-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(38, 222, 129, 0.15);
+            color: var(--success-green);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        .place-link {
+            display: block;
+            margin-top: 12px;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, var(--primary-blue), var(--accent-cyan));
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .place-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(23, 133, 130, 0.4);
+        }
+
+        /* Merchant Dashboard Styles */
+        .merchant-container {
+            padding: 28px;
+        }
+
+        .merchant-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .merchant-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--primary-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .merchant-subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .merchant-form {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .form-section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            background: var(--primary-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .checkbox-item:hover {
+            border-color: var(--primary-blue);
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .checkbox-item label {
+            cursor: pointer;
+            font-size: 14px;
+            flex: 1;
+        }
+
+        .rating-display {
+            background: var(--primary-dark);
+            padding: 24px;
+            border-radius: 12px;
+            text-align: center;
+            margin-top: 24px;
+        }
+
+        .rating-score {
+            font-size: 48px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 8px;
+        }
+
+        .rating-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+
+        .rating-breakdown {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .rating-item {
+            text-align: center;
+        }
+
+        .rating-item-value {
+            font-size: 24px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 4px;
+        }
+
+        .rating-item-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .purifier-recommendations {
+            margin-top: 24px;
+        }
+
+        .purifier-item {
+            background: var(--primary-dark);
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+        }
+
+        .purifier-item:hover {
+            border-color: var(--primary-blue);
+            transform: translateY(-2px);
+        }
+
+        .purifier-name {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--text-primary);
+        }
+
+        .purifier-specs {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+
+        .purifier-price {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--accent-cyan);
+        }
+
+        .purifier-buy-link {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 8px 16px;
+            background: var(--primary-blue);
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .purifier-buy-link:hover {
+            background: var(--accent-cyan);
+            transform: translateY(-1px);
+        }
+
+        #map {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-dark);
+        }
+
+        .leaflet-popup-content-wrapper {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .leaflet-popup-tip {
+            background: var(--bg-card);
+            border-right: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .popup-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .popup-aqi {
+            font-size: 28px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            margin: 8px 0;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 48px 24px;
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .empty-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .error-state {
+            background: rgba(255, 71, 87, 0.1);
+            border: 1px solid rgba(255, 71, 87, 0.3);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .error-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--danger-red);
+            margin-bottom: 8px;
+        }
+
+        .error-message {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .cadr-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 16px;
+        }
+
+        .cadr-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+        }
+
+        .cadr-value {
+            font-size: 36px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-cyan);
+            margin-bottom: 8px;
+        }
+
+        .cadr-explanation {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+
+            #sidebar {
+                width: 100%;
+                height: 50vh;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+            }
+
+            #map {
+                height: 50vh;
+            }
+
+            .mode-toggle {
+                top: 10px;
+                right: 10px;
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-dark);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-blue);
+        }
+    </style>
+</head>
+<body>
+    <div class="mode-toggle">
+        <button class="mode-btn active" onclick="switchMode('user')">🔍 User View</button>
+        <button class="mode-btn" onclick="switchMode('merchant')">🏪 Merchant Dashboard</button>
+    </div>
+
+    <div id="sidebar">
+        <!-- User View -->
+        <div id="userView" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-icon">🌬️</div>
+                    <div>
+                        <h1>AMBIENT</h1>
+                        <div class="tagline">India's Indoor Air Quality Explorer</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="search-section">
+                <div class="input-group">
+                    <label class="input-label">📍 Location (City, India)</label>
+                    <input type="text" id="location" placeholder="e.g., Jaipur, Delhi, Mumbai">
+                </div>
+
+                <div class="input-group">
+                    <label class="input-label">🏢 Place Type</label>
+                    <select id="placeType">
+                        <option value="cafe">☕ Cafe</option>
+                        <option value="restaurant">🍽️ Restaurant</option>
+                        <option value="school">🏫 School</option>
+                        <option value="library">📚 Library</option>
+                        <option value="hospital">🏥 Hospital</option>
+                        <option value="gym">💪 Gym</option>
+                        <option value="house">🏠 My Home</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label class="input-label">📏 Search Radius</label>
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <span>Radius</span>
+                            <span class="slider-value" id="radiusValue">2 km</span>
+                        </div>
+                        <input type="range" id="radiusSlider" min="500" max="5000" step="500" value="2000">
+                    </div>
+                </div>
+
+                <div id="roomDimensions" style="display: none;">
+                    <div class="input-group">
+                        <label class="input-label">📐 Room Dimensions (feet)</label>
+                        <div class="area-inputs">
+                            <input type="number" id="roomLength" class="area-input-small" placeholder="Length" value="15">
+                            <input type="number" id="roomWidth" class="area-input-small" placeholder="Width" value="12">
+                            <input type="number" id="roomHeight" class="area-input-small" placeholder="Height" value="8">
+                        </div>
+                    </div>
+                </div>
+
+                <button class="search-btn" id="searchBtn">
+                    <span id="btnText">Analyze Air Quality</span>
+                </button>
+            </div>
+
+            <div class="results-container" id="results-container">
+                <div class="empty-state">
+                    <div class="empty-icon">🌍</div>
+                    <p class="empty-text">Enter a location in India to discover nearby places with air quality estimates.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Merchant View -->
+        <div id="merchantView" style="display: none; height: 100%; overflow-y: auto;">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-icon">🏪</div>
+                    <div>
+                        <h1>AMBIENT</h1>
+                        <div class="tagline">Merchant Portal</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="merchant-container">
+                <div class="merchant-header">
+                    <div class="merchant-title">Register Your Business</div>
+                    <div class="merchant-subtitle">Improve Your Air Quality Rating</div>
+                </div>
+
+                <div class="merchant-form">
+                    <div class="input-group">
+                        <label class="input-label">🏢 Business Name</label>
+                        <input type="text" id="businessName" placeholder="Enter your business name">
+                    </div>
+
+                    <div class="input-group">
+                        <label class="input-label">📍 Location</label>
+                        <input type="text" id="businessLocation" placeholder="City, State">
+                    </div>
+
+                    <div class="input-group">
+                        <label class="input-label">🏪 Business Type</label>
+                        <select id="businessType">
+                            <option value="cafe">Cafe</option>
+                            <option value="restaurant">Restaurant</option>
+                            <option value="school">School</option>
+                            <option value="library">Library</option>
+                            <option value="gym">Gym</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label class="input-label">📐 Total Area (sq ft)</label>
+                        <input type="number" id="businessArea" placeholder="e.g., 500">
+                    </div>
+
+                    <div class="form-section-title">
+                        💨 Air Purifiers Installed
+                    </div>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="hepa" value="30">
+                            <label for="hepa">HEPA Filter (+30 pts)</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="activated-carbon" value="20">
+                            <label for="activated-carbon">Activated Carbon (+20 pts)</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="uv" value="25">
+                            <label for="uv">UV-C Light (+25 pts)</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="ionizer" value="15">
+                            <label for="ionizer">Ionizer (+15 pts)</label>
+                        </div>
+                    </div>
+
+                    <div class="form-section-title">
+                        🌿 Plants & Natural Elements
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">Number of Indoor Plants</label>
+                        <input type="number" id="plantCount" placeholder="0" min="0" value="0">
+                        <div style="font-size: 11px; color: var(--text-secondary); margin-top: 6px;">
+                            +2 points per plant (max 40 points)
+                        </div>
+                    </div>
+
+                    <div class="form-section-title">
+                        🪟 Ventilation Features
+                    </div>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="windows" value="10">
+                            <label for="windows">Multiple Windows (+10 pts)</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="exhaust" value="15">
+                            <label for="exhaust">Exhaust System (+15 pts)</label>
+                        </div>
+                    </div>
+
+                    <button class="search-btn" onclick="calculateMerchantRating()">
+                        <span>Calculate My Rating</span>
+                    </button>
+                </div>
+
+                <div id="merchantRating" style="display: none;">
+                    <div class="rating-display">
+                        <div class="rating-score" id="totalRating">0</div>
+                        <div class="rating-label">Air Quality Score</div>
+                        <div id="ratingBadge"></div>
+                        
+                        <div class="rating-breakdown">
+                            <div class="rating-item">
+                                <div class="rating-item-value" id="purifierPoints">0</div>
+                                <div class="rating-item-label">Purifiers</div>
+                            </div>
+                            <div class="rating-item">
+                                <div class="rating-item-value" id="plantPoints">0</div>
+                                <div class="rating-item-label">Plants</div>
+                            </div>
+                            <div class="rating-item">
+                                <div class="rating-item-value" id="ventPoints">0</div>
+                                <div class="rating-item-label">Ventilation</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="cadr-section">
+                        <div class="cadr-title">💨 Recommended Air Purifiers for India</div>
+                        <div id="merchantPurifierRecs"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    (function() {
+        let map;
+        let markers = [];
+        let currentMode = 'user';
+
+        // India-specific air purifier recommendations
+        const indiaPurifiers = [
+            {
+                name: "Mi Air Purifier 3",
+                cadr: 380,
+                coverage: 484,
+                price: "₹9,999",
+                features: "True HEPA, Smart Control, OLED Display",
+                buyLink: "https://www.mi.com/in/air-purifier-3/"
+            },
+            {
+                name: "Philips AC1215/20",
+                cadr: 270,
+                coverage: 678,
+                price: "₹15,995",
+                features: "VitaShield IPS, Numerical PM2.5 Display",
+                buyLink: "https://www.philips.co.in/c-m-ho/air-purifiers"
+            },
+            {
+                name: "Honeywell Air Touch i8",
+                cadr: 300,
+                coverage: 387,
+                price: "₹13,990",
+                features: "Pre-Filter + H13 HEPA + Activated Carbon",
+                buyLink: "https://honeywellairpurifierindia.com/"
+            },
+            {
+                name: "Coway Sleek Pro AP-1009",
+                cadr: 303,
+                coverage: 355,
+                price: "₹17,990",
+                features: "4-Stage Filtration, Eco Mode",
+                buyLink: "https://www.coway.co.in/"
+            },
+            {
+                name: "Kent Aura",
+                cadr: 180,
+                coverage: 270,
+                price: "₹8,999",
+                features: "HEPA + Activated Carbon, Ionizer",
+                buyLink: "https://www.kentro.com/air-purifiers"
+            },
+            {
+                name: "Dyson Pure Cool TP04",
+                cadr: 320,
+                coverage: 800,
+                price: "₹44,900",
+                features: "HEPA + Activated Carbon, Air Multiplier",
+                buyLink: "https://www.dyson.in/air-treatment/purifiers"
+            },
+            {
+                name: "Blueair Blue Pure 411",
+                cadr: 105,
+                coverage: 161,
+                price: "₹11,999",
+                features: "Particle + Carbon Filter, Quiet Operation",
+                buyLink: "https://www.blueair.com/in"
+            },
+            {
+                name: "Sharp FP-J30M-A",
+                cadr: 144,
+                coverage: 226,
+                price: "₹12,490",
+                features: "Plasmacluster Ion Technology, HEPA",
+                buyLink: "https://www.sharp-india.com/"
+            },
+            {
+                name: "Eureka Forbes Aeroguard AP 700",
+                cadr: 220,
+                coverage: 300,
+                price: "₹14,999",
+                features: "Surround 360° Technology, 3-Stage",
+                buyLink: "https://www.eurekaforbes.com/"
+            },
+            {
+                name: "Atlanta Healthcare Frescia 280",
+                cadr: 280,
+                coverage: 350,
+                price: "₹16,999",
+                features: "Medical Grade H13 HEPA, UV-C",
+                buyLink: "https://www.atlantahealthcare.com/"
+            }
+        ];
+
+        // Unsplash Access Key - Replace with your own for production
+        const UNSPLASH_ACCESS_KEY = 'demo_key'; // This is a demo - won't work in production
+
+        function switchMode(mode) {
+            currentMode = mode;
+            const userView = document.getElementById('userView');
+            const merchantView = document.getElementById('merchantView');
+            const buttons = document.querySelectorAll('.mode-btn');
+
+            buttons.forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            if (mode === 'user') {
+                userView.style.display = 'flex';
+                merchantView.style.display = 'none';
+            } else {
+                userView.style.display = 'none';
+                merchantView.style.display = 'block';
+            }
+        }
+
+        window.switchMode = switchMode;
+
+        function initMap() {
+            map = L.map('map', {
+                center: [20.5937, 78.9629],
+                zoom: 5,
+                zoomControl: true
+            });
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+                maxZoom: 19
+            }).addTo(map);
+        }
+
+        // Radius slider
+        const radiusSlider = document.getElementById('radiusSlider');
+        const radiusValue = document.getElementById('radiusValue');
+
+        radiusSlider.addEventListener('input', function() {
+            const km = (this.value / 1000).toFixed(1);
+            radiusValue.textContent = `${km} km`;
+        });
+
+        // Show/hide room dimensions
+        document.getElementById('placeType').addEventListener('change', function() {
+            const roomDimensions = document.getElementById('roomDimensions');
+            roomDimensions.style.display = this.value === 'house' ? 'block' : 'none';
+        });
+
+        function getAQIClass(aqi) {
+            if (aqi <= 50) return 'aqi-good';
+            if (aqi <= 100) return 'aqi-moderate';
+            return 'aqi-unhealthy';
+        }
+
+        function getAQIBadge(aqi) {
+            if (aqi <= 50) return { class: 'badge-good', text: 'Good' };
+            if (aqi <= 100) return { class: 'badge-moderate', text: 'Moderate' };
+            return { class: 'badge-unhealthy', text: 'Unhealthy' };
+        }
+
+        function calculateIndoorAQI(outdoorAQI, placeType, index) {
+            const reductions = {
+                cafe: [0.3, 0.4, 0.35, 0.25, 0.38],
+                restaurant: [0.2, 0.3, 0.25, 0.28, 0.22],
+                school: [0.4, 0.5, 0.45, 0.42, 0.48],
+                library: [0.5, 0.6, 0.55, 0.52, 0.58],
+                hospital: [0.6, 0.7, 0.65, 0.62, 0.68],
+                gym: [0.15, 0.25, 0.2, 0.18, 0.22],
+                house: [0.4, 0.4, 0.4, 0.4, 0.4]
+            };
+
+            const reduction = reductions[placeType]?.[index % 5] || 0.3;
+            return Math.round(outdoorAQI * (1 - reduction));
+        }
+
+        function getAQIBreakdown(outdoorAQI, indoorAQI, placeType) {
+            const reduction = Math.round(((outdoorAQI - indoorAQI) / outdoorAQI) * 100);
+            const reasons = {
+                cafe: 'AC filtration, limited occupancy',
+                restaurant: 'Kitchen emissions partially offset filtration',
+                school: 'Good ventilation, regular maintenance',
+                library: 'Minimal activity, excellent air circulation',
+                hospital: 'Medical-grade HEPA systems',
+                gym: 'High activity increases particulates',
+                house: 'Standard home ventilation'
+            };
+
+            return `Outdoor: ${outdoorAQI} → Indoor: ${indoorAQI} (${reduction}% reduction). ${reasons[placeType] || 'Standard filtration'}`;
+        }
+
+        function calculateCADR(length, width, height) {
+            const volume = length * width * height;
+            const airChanges = 5;
+            const cadr = Math.round((volume * airChanges) / 60);
+            return cadr;
+        }
+
+        function recommendPurifiers(requiredCADR, roomArea) {
+            return indiaPurifiers
+                .filter(p => p.cadr >= requiredCADR * 0.8 && p.coverage >= roomArea * 0.8)
+                .sort((a, b) => {
+                    const aScore = Math.abs(a.cadr - requiredCADR) + Math.abs(a.coverage - roomArea);
+                    const bScore = Math.abs(b.cadr - requiredCADR) + Math.abs(b.coverage - roomArea);
+                    return aScore - bScore;
+                })
+                .slice(0, 3);
+        }
+
+        async function getPlaceSpecificImage(placeType, placeName, lat, lon) {
+            // Try to get place photo from Wikimedia Commons or other sources
+            // For now, we'll use a combination of place name and location to generate more specific images
+            
+            // Use Mapillary or other street-level imagery when available
+            // Fallback to category-specific high-quality images
+            
+            try {
+                // Try to search for the specific place on Wikimedia Commons
+                if (placeName && !placeName.includes('Unnamed')) {
+                    const wikiSearchUrl = `https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrsearch=${encodeURIComponent(placeName)}&gsrlimit=1&prop=imageinfo&iiprop=url&iiurlwidth=400`;
+                    
+                    const response = await fetch(wikiSearchUrl);
+                    const data = await response.json();
+                    
+                    if (data.query && data.query.pages) {
+                        const pages = Object.values(data.query.pages);
+                        if (pages[0]?.imageinfo?.[0]?.thumburl) {
+                            return pages[0].imageinfo[0].thumburl;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.log('Could not fetch specific image, using category default');
+            }
+            
+            // Fallback to high-quality category images with variation
+            const imageVariants = {
+                cafe: [
+                    'https://images.unsplash.com/photo-1445116572660-236099ec97a0?w=400&h=400&fit=crop',
+                    'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=400&h=400&fit=crop',
+                    'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=400&h=400&fit=crop',
+                    'https://images.unsplash.com/photo-1453614512568-c4024d13c247?w=400&h=400&fit=crop',
+                    'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400&h=400&fit=crop'
+                ],
+                restaurant: [
+                    'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=400&fit=crop',
+                    'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=400&fit=crop',
+                    'https://images.unsplash.com/photo-1592861956120-e524fc739696?w=400&h=400&fit=crop',
+                    'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=400&fit=crop',
+                    'https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?w=400&h=400&fit=crop'
+                ],
+                school: [
+                    'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=400&h=400&fit=crop',
+                    'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=400&fit=crop',
+                    'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?w=400&h=400&fit=crop',
+                    'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=400&h=400&fit=crop',
+                    'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=400&h=400&fit=crop'
+                ],
+                library: [
+                    'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=400&h=400&fit=crop',
+                    'https://images.unsplash.com/photo-1507842217343-583bb7270b66?w=400&h=400&fit=crop',
+                    'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=400&fit=crop',
+                    'https://images.unsplash.com/photo-1519682337058-a94d519337bc?w=400&h=400&fit=crop',
+                    'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=400&h=400&fit=crop'
+                ],
+                hospital: [
+                    'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=400&h=400&fit=crop',
+                    'https://images.unsplash.com/photo-1538108149393-fbbd81895907?w=400&h=400&fit=crop',
+                    'https://images.unsplash.com/photo-1516549655169-df83a0774514?w=400&h=400&fit=crop',
+                    'https://images.unsplash.com/photo-1512678080530-7760d81faba6?w=400&h=400&fit=crop',
+                    'https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?w=400&h=400&fit=crop'
+                ],
+                gym: [
+                    'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&h=400&fit=crop',
+                    'https://images.unsplash.com/photo-1571902943202-507ec2618e8f?w=400&h=400&fit=crop',
+                    'https://images.unsplash.com/photo-1540497077202-7c8a3999166f?w=400&h=400&fit=crop',
+                    'https://images.unsplash.com/photo-1576678927484-cc907957088c?w=400&h=400&fit=crop',
+                    'https://images.unsplash.com/photo-1593476087123-36d1de271f08?w=400&h=400&fit=crop'
+                ]
+            };
+            
+            // Use name hash to consistently pick same image for same place
+            const variants = imageVariants[placeType] || imageVariants.cafe;
+            const hash = placeName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+            const imageIndex = hash % variants.length;
+            
+            return variants[imageIndex];
+        }
+
+        function getAddressString(tags) {
+            const parts = [];
+            
+            if (tags['addr:street']) parts.push(tags['addr:street']);
+            if (tags['addr:city']) parts.push(tags['addr:city']);
+            if (tags['addr:postcode']) parts.push(tags['addr:postcode']);
+            
+            return parts.length > 0 ? parts.join(', ') : '';
+        }
+
+        async function startSearch() {
+            const location = document.getElementById('location').value.trim();
+            const placeType = document.getElementById('placeType').value;
+            const radius = parseInt(document.getElementById('radiusSlider').value);
+            const btn = document.getElementById('searchBtn');
+            const btnText = document.getElementById('btnText');
+
+            if (!location) {
+                showError('Please enter a location in India');
+                return;
+            }
+
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+
+            btn.classList.add('loading');
+            btnText.textContent = 'Searching...';
+
+            try {
+                const geoResp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location + ', India')}`);
+                const geoData = await geoResp.json();
+
+                if (!geoData || geoData.length === 0) {
+                    throw new Error('Location not found. Please try another city in India.');
+                }
+
+                const { lat, lon } = geoData[0];
+                map.setView([lat, lon], 13);
+
+                const aqiResp = await fetch(`https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=demo`);
+                let outdoorAQI = 75;
+
+                try {
+                    const aqiData = await aqiResp.json();
+                    if (aqiData.list && aqiData.list[0]) {
+                        const aqi = aqiData.list[0].main.aqi;
+                        outdoorAQI = aqi * 50;
+                    }
+                } catch (e) {
+                    console.log('Using estimated AQI for India location');
+                    outdoorAQI = Math.floor(Math.random() * 100) + 100; // India typical range
+                }
+
+                if (placeType === 'house') {
+                    showHomeEstimate(lat, lon, outdoorAQI);
+                } else {
+                    await findPlaces(lat, lon, placeType, outdoorAQI, radius);
+                }
+            } catch (error) {
+                console.error('Search error:', error);
+                showError(error.message);
+            } finally {
+                btn.classList.remove('loading');
+                btnText.textContent = 'Analyze Air Quality';
+            }
+        }
+
+        async function findPlaces(lat, lon, type, outdoorAQI, radius) {
+            try {
+                const query = `[out:json];node["amenity"="${type}"](around:${radius},${lat},${lon});out;`;
+                
+                const resp = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
+                
+                if (!resp.ok) throw new Error('Failed to fetch nearby places');
+                
+                const data = await resp.json();
+                
+                const resultsContainer = document.getElementById('results-container');
+                
+                if (!data.elements || data.elements.length === 0) {
+                    resultsContainer.innerHTML = '<div class="empty-state"><div class="empty-icon">📍</div><p class="empty-text">No places found in this area. Try increasing the search radius or a different location.</p></div>';
+                    return;
+                }
+
+                let html = `
+                    <div class="results-header">
+                        <span class="results-title">Results</span>
+                        <span class="results-count">${data.elements.length} found</span>
+                    </div>
+                `;
+
+                for (let i = 0; i < data.elements.length; i++) {
+                    const place = data.elements[i];
+                    const indoorAQI = calculateIndoorAQI(outdoorAQI, type, i);
+                    const name = place.tags?.name || `Unnamed ${type} #${i + 1}`;
+                    const aqiClass = getAQIClass(indoorAQI);
+                    const badge = getAQIBadge(indoorAQI);
+                    const breakdown = getAQIBreakdown(outdoorAQI, indoorAQI, type);
+                    
+                    // Get address info
+                    const address = getAddressString(place.tags);
+                    
+                    // Create Google Maps link
+                    const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lon}`;
+                    
+                    // Get place-specific image
+                    const imageUrl = await getPlaceSpecificImage(type, name, place.lat, place.lon);
+                    
+                    // Simulate some places having improvements
+                    const hasImprovement = i % 3 === 0;
+                    const improvementHTML = hasImprovement ? 
+                        `<div class="improvement-badge">✓ Air Purifiers Installed</div>` : '';
+                    
+                    html += `
+                        <div class="place-item">
+                            <div class="place-header">
+                                <img src="${imageUrl}" alt="${name}" class="place-image" onerror="this.src='https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&h=400&fit=crop'">
+                                <div class="place-info">
+                                    <div class="place-name" onclick="window.focusMarker(${place.lat}, ${place.lon})" style="cursor: pointer;">
+                                        ${name}
+                                    </div>
+                                    ${address ? `<div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 6px;">${address}</div>` : ''}
+                                    <div class="place-aqi">
+                                        <span class="aqi-label">Indoor AQI</span>
+                                        <span class="aqi-value ${aqiClass}">${indoorAQI}</span>
+                                        <span class="aqi-badge ${badge.class}">${badge.text}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="place-details">${breakdown}</div>
+                            ${improvementHTML}
+                            <a href="${googleMapsUrl}" target="_blank" class="place-link">
+                                📍 View on Google Maps & Get Directions →
+                            </a>
+                        </div>
+                    `;
+
+                    const markerColor = indoorAQI <= 50 ? '#26de81' : indoorAQI <= 100 ? '#ffa502' : '#ff4757';
+                    const marker = L.circleMarker([place.lat, place.lon], {
+                        radius: 8,
+                        fillColor: markerColor,
+                        color: '#fff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    }).addTo(map);
+                    
+                    marker.bindPopup(`
+                        <div class="popup-title">${name}</div>
+                        <div style="font-size: 12px; color: #9ca3af; margin-bottom: 6px;">Estimated Indoor AQI</div>
+                        <div class="popup-aqi ${aqiClass}">${indoorAQI}</div>
+                        <div style="font-size: 11px; color: #9ca3af; margin-top: 8px;">${breakdown}</div>
+                    `);
+                    
+                    markers.push(marker);
+                }
+
+                resultsContainer.innerHTML = html;
+            } catch (error) {
+                console.error('Error finding places:', error);
+                showError('Failed to find nearby places. Please try again.');
+            }
+        }
+
+        function showHomeEstimate(lat, lon, outdoorAQI) {
+            const length = parseFloat(document.getElementById('roomLength').value) || 15;
+            const width = parseFloat(document.getElementById('roomWidth').value) || 12;
+            const height = parseFloat(document.getElementById('roomHeight').value) || 8;
+            
+            const requiredCADR = calculateCADR(length, width, height);
+            const roomArea = length * width;
+            const indoorAQI = calculateIndoorAQI(outdoorAQI, 'house', 0);
+            const aqiClass = getAQIClass(indoorAQI);
+            const badge = getAQIBadge(indoorAQI);
+            const breakdown = getAQIBreakdown(outdoorAQI, indoorAQI, 'house');
+            
+            const recommendations = recommendPurifiers(requiredCADR, roomArea);
+            
+            let purifierHTML = '';
+            if (recommendations.length > 0) {
+                purifierHTML = recommendations.map(p => `
+                    <div class="purifier-item">
+                        <div class="purifier-name">${p.name}</div>
+                        <div class="purifier-specs">CADR: ${p.cadr} CFM | Coverage: ${p.coverage} sq ft<br>${p.features}</div>
+                        <div class="purifier-price">${p.price}</div>
+                        <a href="${p.buyLink}" target="_blank" class="purifier-buy-link">View Details →</a>
+                    </div>
+                `).join('');
+            } else {
+                purifierHTML = '<div class="purifier-item"><div class="purifier-specs">No suitable purifiers found for this room size. Consider a commercial-grade system.</div></div>';
+            }
+            
+            const resultsContainer = document.getElementById('results-container');
+            resultsContainer.innerHTML = `
+                <div class="results-header">
+                    <span class="results-title">Your Home</span>
+                </div>
+                <div class="place-item">
+                    <div class="place-name">Room: ${length}' × ${width}' × ${height}'</div>
+                    <div class="place-aqi">
+                        <span class="aqi-label">Indoor AQI</span>
+                        <span class="aqi-value ${aqiClass}">${indoorAQI}</span>
+                        <span class="aqi-badge ${badge.class}">${badge.text}</span>
+                    </div>
+                    <div class="place-details">${breakdown}</div>
+                </div>
+
+                <div class="cadr-section">
+                    <div class="cadr-title">💨 Recommended Air Purifier Specs</div>
+                    <div class="cadr-value">${requiredCADR} CFM</div>
+                    <div class="cadr-explanation">
+                        Based on your room size (${Math.round(roomArea)} sq ft, ${Math.round(length * width * height)} cu ft), 
+                        you need a purifier with a Clean Air Delivery Rate of at least ${requiredCADR} CFM for 5 air changes per hour.
+                    </div>
+                    
+                    <div class="purifier-recommendations">
+                        <div style="font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 10px; text-transform: uppercase;">
+                            Top Recommendations for India:
+                        </div>
+                        ${purifierHTML}
+                    </div>
+                </div>
+            `;
+
+            const markerColor = indoorAQI <= 50 ? '#26de81' : indoorAQI <= 100 ? '#ffa502' : '#ff4757';
+            const marker = L.circleMarker([lat, lon], {
+                radius: 10,
+                fillColor: markerColor,
+                color: '#fff',
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.8
+            }).addTo(map);
+            
+            marker.bindPopup(`
+                <div class="popup-title">Your Location</div>
+                <div style="font-size: 12px; color: #9ca3af; margin-bottom: 6px;">Estimated Indoor AQI</div>
+                <div class="popup-aqi ${aqiClass}">${indoorAQI}</div>
+                <div style="font-size: 11px; color: #9ca3af; margin-top: 8px;">Required CADR: ${requiredCADR} CFM</div>
+            `).openPopup();
+            
+            markers.push(marker);
+        }
+
+        function calculateMerchantRating() {
+            const businessArea = parseFloat(document.getElementById('businessArea').value) || 500;
+            
+            let purifierPoints = 0;
+            let plantPoints = 0;
+            let ventPoints = 0;
+
+            // Calculate purifier points
+            document.querySelectorAll('#merchantView input[type="checkbox"]:checked').forEach(cb => {
+                const value = parseInt(cb.value);
+                const id = cb.id;
+                
+                if (['hepa', 'activated-carbon', 'uv', 'ionizer'].includes(id)) {
+                    purifierPoints += value;
+                } else if (['windows', 'exhaust'].includes(id)) {
+                    ventPoints += value;
+                }
+            });
+
+            // Calculate plant points
+            const plantCount = parseInt(document.getElementById('plantCount').value) || 0;
+            plantPoints = Math.min(plantCount * 2, 40);
+
+            const totalRating = purifierPoints + plantPoints + ventPoints;
+            
+            // Show rating display
+            document.getElementById('merchantRating').style.display = 'block';
+            document.getElementById('totalRating').textContent = totalRating;
+            document.getElementById('purifierPoints').textContent = purifierPoints;
+            document.getElementById('plantPoints').textContent = plantPoints;
+            document.getElementById('ventPoints').textContent = ventPoints;
+
+            // Show badge
+            let badgeHTML = '';
+            if (totalRating >= 80) {
+                badgeHTML = '<div class="aqi-badge badge-good">⭐ Excellent Air Quality</div>';
+            } else if (totalRating >= 50) {
+                badgeHTML = '<div class="aqi-badge badge-moderate">👍 Good Air Quality</div>';
+            } else {
+                badgeHTML = '<div class="aqi-badge badge-unhealthy">⚠️ Needs Improvement</div>';
+            }
+            document.getElementById('ratingBadge').innerHTML = badgeHTML;
+
+            // Calculate required CADR
+            const requiredCADR = Math.round((businessArea * 8 * 5) / 60);
+            
+            // Get recommendations
+            const recommendations = recommendPurifiers(requiredCADR, businessArea);
+            
+            let purifierHTML = '';
+            if (recommendations.length > 0) {
+                purifierHTML = `
+                    <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
+                        For your ${businessArea} sq ft space, you need approximately ${requiredCADR} CFM CADR.
+                    </div>
+                `;
+                purifierHTML += recommendations.map(p => `
+                    <div class="purifier-item">
+                        <div class="purifier-name">${p.name}</div>
+                        <div class="purifier-specs">CADR: ${p.cadr} CFM | Coverage: ${p.coverage} sq ft<br>${p.features}</div>
+                        <div class="purifier-price">${p.price}</div>
+                        <a href="${p.buyLink}" target="_blank" class="purifier-buy-link">Buy Now →</a>
+                    </div>
+                `).join('');
+            } else {
+                purifierHTML = `
+                    <div class="purifier-item">
+                        <div class="purifier-specs">Your space is very large. Consider multiple units or commercial systems.</div>
+                    </div>
+                `;
+            }
+            
+            document.getElementById('merchantPurifierRecs').innerHTML = purifierHTML;
+
+            // Scroll to rating
+            document.getElementById('merchantRating').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        window.calculateMerchantRating = calculateMerchantRating;
+
+        function focusMarker(lat, lon) {
+            if (!map) return;
+            
+            map.setView([lat, lon], 16);
+            markers.forEach(marker => {
+                const markerLatLng = marker.getLatLng();
+                if (Math.abs(markerLatLng.lat - lat) < 0.0001 && Math.abs(markerLatLng.lng - lon) < 0.0001) {
+                    marker.openPopup();
+                }
+            });
+        }
+
+        function showError(message) {
+            const resultsContainer = document.getElementById('results-container');
+            resultsContainer.innerHTML = `
+                <div class="error-state">
+                    <div class="error-title">⚠️ Error</div>
+                    <div class="error-message">${message}</div>
+                </div>
+            `;
+        }
+
+        window.focusMarker = focusMarker;
+        window.startSearch = startSearch;
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                initMap();
+                document.getElementById('searchBtn').addEventListener('click', startSearch);
+                document.getElementById('location').addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') startSearch();
+                });
+            });
+        } else {
+            initMap();
+            document.getElementById('searchBtn').addEventListener('click', startSearch);
+            document.getElementById('location').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') startSearch();
+            });
+        }
+
+    })();
+</script>
+
+</body>
+</html>
